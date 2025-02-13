@@ -88,7 +88,7 @@ namespace color_point_cloud {
     void ColorPointCloud::timer_callback() {
         for (const auto &pair: camera_type_stdmap_) {
             if (pair.second->get_image_msg() == nullptr || pair.second->get_camera_info() == nullptr) {
-//                RCLCPP_INFO(this->get_logger(), "Image or camera info is null for topic: %s", pair.first.c_str());
+               RCLCPP_INFO(this->get_logger(), "Image or camera info is null for topic: %s", pair.first.c_str());
                 continue;
             }
 
@@ -114,13 +114,56 @@ namespace color_point_cloud {
         sensor_msgs::msg::PointCloud2 cloud_color_msg;
         std::for_each(camera_type_stdmap_.begin(), camera_type_stdmap_.end(),
                       [this, &cloud_color_msg, msg](std::pair<std::string, CameraTypePtr> pair) {
-                          if (pair.second->get_image_msg() == nullptr || pair.second->get_camera_info() == nullptr ||
-                              !pair.second->is_info_initialized() || !pair.second->is_transform_initialized()) {
-                              RCLCPP_INFO(this->get_logger(),
-                                          "Cant project camera: %s \n\n Expected reasons: \n don't receive image \n don't receive \n can't get transforme \n can't init camera utils",
-                                          pair.first.c_str());
-                              return;
-                          }
+                        //   if (pair.second->get_image_msg() == nullptr 
+                        //   || pair.second->get_camera_info() == nullptr ||
+                        //       !pair.second->is_info_initialized() || 
+                        //       !pair.second->is_transform_initialized()) {
+                        //       RCLCPP_INFO(this->get_logger(),
+                        //                   "Cant project camera: %s \n\n 
+                        //                   Expected reasons: \n 
+                        //                   don't receive image \n 
+                        //                   don't receive \n 
+                        //                   can't get transforme \n 
+                        //                   can't init camera utils",
+                        //                   pair.first.c_str());
+                        //       return;
+                        //   }
+
+                        // Collect all reasons for failure in a single string
+                        bool all_good = true;
+                        std::stringstream failure_reasons;
+
+                        if (pair.second->get_image_msg() == nullptr) {
+                            failure_reasons << "- Image message is null.\n";
+                            all_good = false;
+                        }
+
+                        if (pair.second->get_camera_info() == nullptr) {
+                            failure_reasons << "- Camera info is null.\n";
+                            all_good = false;
+                        }
+
+                        if (!pair.second->is_info_initialized()) {
+                            failure_reasons << "- Camera info not initialized.\n";
+                            all_good = false;
+                        }
+
+                        if (!pair.second->is_transform_initialized()) {
+                            failure_reasons << "- Transform not initialized.\n";
+                            all_good = false;
+                        }
+
+                        // If any condition failed, log them and return early for this camera
+                        if (!all_good) {
+                            RCLCPP_INFO(
+                            this->get_logger(),
+                            "Cannot project camera '%s' for the following reasons:\n%s",
+                            pair.first.c_str(),
+                            failure_reasons.str().c_str()
+                            );
+                            return; // Skip processing for this camera
+                        }
+
                           pair.second->set_cv_image(pair.second->get_image_msg(), image_type_);
 
                           sensor_msgs::PointCloud2Modifier modifier(cloud_color_msg);
@@ -203,8 +246,8 @@ namespace color_point_cloud {
 
                               cloud.nextPoint();
                           }
-//                          cv::imshow(pair.first, pair.second->get_cv_image());
-//                          cv::waitKey(1);
+                         cv::imshow(pair.first, pair.second->get_cv_image());
+                         cv::waitKey(1);
                       });
 
         cloud_color_msg.header = msg->header;
